@@ -1,0 +1,49 @@
+﻿# Environment files (never commit)
+.env
+.env.dev
+.env.prod
+env.dev
+env.prod
+
+# Credentials / keys (never commit)
+supabase_pat.txt
+otp.txt
+firebase-service-account.json
+**/firebase-service-account.json
+*.pem
+*.p12
+android/key.properties
+*.jks
+*.keystore
+
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDE
+.idea/
+.vscode/
+*.iml
+android/.kotlin/
+
+# Platform specific
+google-services.json
+GoogleService-Info.plist
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Supabase
+supabase/.temp/
+
+# Local artifacts
+release/
+.preview_*.png
+test/failures/
+
+# Stray empty scaffold
+/the_city_property/
