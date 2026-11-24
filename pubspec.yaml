@@ -33,6 +33,7 @@ dependencies:
   printing: ^5.14.3
   image: 4.5.4
   archive: 4.0.8
+  flutter_launcher_icons: ^0.14.4
 
 dev_dependencies:
   flutter_test:
@@ -58,3 +59,13 @@ flutter:
           weight: 700
         - asset: assets/fonts/Tajawal-ExtraBold.ttf
           weight: 800
+
+# ==========================================
+# إعدادات توليد أيقونات التطبيق
+# ==========================================
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
