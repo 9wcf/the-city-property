@@ -10,6 +10,7 @@ import '../../../core/widgets/premium_widgets.dart';
 import '../../../data/models.dart';
 import '../../shared/lease_documents_sheet.dart';
 import 'web_ui.dart';
+import '../../../core/i18n/app_country.dart';
 import '../../../core/i18n/i18n.dart';
 
 enum _UnitFilter { all, rented, vacant, maintenance, reserved }
@@ -73,7 +74,7 @@ class _MagicApartmentsDialogState extends ConsumerState<MagicApartmentsDialog> {
     }
   }
 
-  List<_UnitInfo> _collect(OwnerDashboardData data) {
+  List<_UnitInfo> _collect(OwnerDashboardData data, AppCountry country) {
     final tenants = <String, TenantRecord>{
       for (final tenant in data.snapshot.tenants) tenant.apartment.id: tenant,
     };
@@ -83,6 +84,7 @@ class _MagicApartmentsDialogState extends ConsumerState<MagicApartmentsDialog> {
     }
     final units = <_UnitInfo>[];
     for (final property in data.snapshot.portfolio.compounds) {
+      if (property.country != country) continue;
       for (final building in property.buildings) {
         for (final apartment in building.apartments) {
           final tenant = tenants[apartment.id];
@@ -122,6 +124,7 @@ class _MagicApartmentsDialogState extends ConsumerState<MagicApartmentsDialog> {
   @override
   Widget build(BuildContext context) {
     final dashboard = ref.watch(ownerDashboardProvider);
+    final country = ref.watch(ownerCountryProvider);
     final size = MediaQuery.sizeOf(context);
     return Dialog(
       insetPadding: const EdgeInsets.all(16),
@@ -164,8 +167,17 @@ class _MagicApartmentsDialogState extends ConsumerState<MagicApartmentsDialog> {
               ),
             ),
             data: (data) {
-              final units = _collect(data);
+              final units = _collect(data, country);
               final visible = _visible(units);
+              final monthlyExpected = units
+                  .where((unit) =>
+                      unit.apartment.status == ApartmentStatus.occupied)
+                  .fold<double>(
+                      0, (sum, unit) => sum + unit.apartment.rentAmount);
+              final collectedThisMonth = units.fold<double>(
+                  0, (sum, unit) => sum + (unit.tenant?.paidThisMonth ?? 0));
+              final outstanding = units.fold<double>(
+                  0, (sum, unit) => sum + unit.outstanding);
               final buildings = <String, _BuildingOption>{};
               for (final unit in units) {
                 buildings[unit.building.id] = _BuildingOption(
@@ -178,6 +190,9 @@ class _MagicApartmentsDialogState extends ConsumerState<MagicApartmentsDialog> {
               return Column(
                 children: [
                   _Header(
+                    title: I18n.isEnglish
+                        ? 'Magic button — ${country.name(english: true)} apartments'
+                        : 'الزر السحري — شقق ${country.name(english: false)}',
                     refreshing: _refreshing,
                     onRefresh: _refresh,
                     onClose: () => Navigator.of(context).maybePop(),
@@ -194,7 +209,12 @@ class _MagicApartmentsDialogState extends ConsumerState<MagicApartmentsDialog> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _Summary(data: data, units: units),
+                          _Summary(
+                            units: units,
+                            monthlyExpected: monthlyExpected,
+                            collectedThisMonth: collectedThisMonth,
+                            outstanding: outstanding,
+                          ),
                           const SizedBox(height: AppSpacing.md),
                           _Toolbar(
                             search: _search,
@@ -313,11 +333,13 @@ class _UnitInfo {
 
 class _Header extends StatelessWidget {
   const _Header({
+    required this.title,
     required this.refreshing,
     required this.onRefresh,
     required this.onClose,
   });
 
+  final String title;
   final bool refreshing;
   final VoidCallback onRefresh;
   final VoidCallback onClose;
@@ -354,23 +376,23 @@ class _Header extends StatelessWidget {
                 size: 24, color: AppColors.navy900),
           ),
           const SizedBox(width: AppSpacing.md),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'الزر السحري — كل الشقق',
+                  title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Tajawal',
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                SizedBox(height: 2),
-                Text(
+                const SizedBox(height: 2),
+                const Text(
                   'المؤجرة والفارغة · العمارة والمستأجر · المتبقي من الإيجار وكل التفاصيل',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -410,14 +432,20 @@ class _Header extends StatelessWidget {
 }
 
 class _Summary extends StatelessWidget {
-  const _Summary({required this.data, required this.units});
+  const _Summary({
+    required this.units,
+    required this.monthlyExpected,
+    required this.collectedThisMonth,
+    required this.outstanding,
+  });
 
-  final OwnerDashboardData data;
   final List<_UnitInfo> units;
+  final double monthlyExpected;
+  final double collectedThisMonth;
+  final double outstanding;
 
   @override
   Widget build(BuildContext context) {
-    final portfolio = data.snapshot.portfolio;
     final rented = units
         .where((u) => u.apartment.status == ApartmentStatus.occupied)
         .toList();
@@ -461,13 +489,13 @@ class _Summary extends StatelessWidget {
         ),
         _StatTile(
           label: 'الإيجار الشهري المتوقع',
-          value: moneyText(portfolio.monthlyExpected),
+          value: moneyText(monthlyExpected),
           icon: Icons.payments_rounded,
           color: AppColors.gold,
         ),
         _StatTile(
           label: 'محصّل هذا الشهر',
-          value: moneyText(data.snapshot.collectedThisMonth),
+          value: moneyText(collectedThisMonth),
           icon: Icons.savings_rounded,
           color: AppColors.occupied,
         ),
@@ -479,9 +507,9 @@ class _Summary extends StatelessWidget {
         ),
         _StatTile(
           label: 'متأخرات الفواتير',
-          value: moneyText(data.totalOutstanding),
+          value: moneyText(outstanding),
           icon: Icons.receipt_long_rounded,
-          color: data.totalOutstanding > 0
+          color: outstanding > 0
               ? AppColors.danger
               : AppColors.occupied,
           caption: overdueUnits > 0 ? '$overdueUnits شقة عليها متأخرات' : null,

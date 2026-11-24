@@ -36,9 +36,18 @@ class OwnerWebShell extends ConsumerStatefulWidget {
 }
 
 class _OwnerWebShellState extends ConsumerState<OwnerWebShell> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   OwnerSection _section = OwnerSection.overview;
   final Set<OwnerSection> _visited = {OwnerSection.overview};
   bool _refreshing = false;
+
+  static const List<OwnerSection> _primarySections = [
+    OwnerSection.overview,
+    OwnerSection.portfolio,
+    OwnerSection.requests,
+    OwnerSection.accounting,
+    OwnerSection.notifications,
+  ];
 
   static const _sections = OwnerSection.values;
 
@@ -48,6 +57,14 @@ class _OwnerWebShellState extends ConsumerState<OwnerWebShell> {
       _section = section;
       _visited.add(section);
     });
+  }
+
+  void _selectAndClose(OwnerSection section) {
+    _select(section);
+    final scaffold = _scaffoldKey.currentState;
+    if (scaffold != null && scaffold.isDrawerOpen) {
+      scaffold.closeDrawer();
+    }
   }
 
   void _openCountry(AppCountry country) {
@@ -147,7 +164,6 @@ class _OwnerWebShellState extends ConsumerState<OwnerWebShell> {
       );
     }
     final width = MediaQuery.sizeOf(context).width;
-    final sidebarWidth = width < 1180 ? 218.0 : 264.0;
     final unread = ref.watch(unreadNotificationsProvider).maybeWhen(
           data: (value) => value,
           orElse: () => 0,
@@ -166,6 +182,12 @@ class _OwnerWebShellState extends ConsumerState<OwnerWebShell> {
           orElse: () => 0,
         );
     defaultDisplayCountry = country;
+
+    if (width < 1020) {
+      return _buildCompact(unread: unread, pending: pending, country: country);
+    }
+
+    final sidebarWidth = width < 1180 ? 218.0 : 264.0;
 
     return Scaffold(
       backgroundColor: AppColors.navy900,
@@ -217,6 +239,104 @@ class _OwnerWebShellState extends ConsumerState<OwnerWebShell> {
       ),
     );
   }
+
+  Widget _buildCompact({
+    required int unread,
+    required int pending,
+    required AppCountry country,
+  }) {
+    final primaryIndex = _primarySections.indexOf(_section);
+
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: AppColors.navy900,
+      drawer: Drawer(
+        backgroundColor: AppColors.navy950,
+        child: _Sidebar(
+          profile: widget.profile,
+          section: _section,
+          unread: unread,
+          pending: pending,
+          country: country,
+          onSelect: _selectAndClose,
+          onSignOut: _confirmSignOut,
+          showExtras: true,
+          onCountries: _backToCountries,
+          onCountry: (value) =>
+              ref.read(ownerCountryProvider.notifier).state = value,
+        ),
+      ),
+      body: PremiumBackground(
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              _CompactTopBar(
+                section: _section,
+                country: country,
+                unread: unread,
+                refreshing: _refreshing,
+                onMenu: () => _scaffoldKey.currentState?.openDrawer(),
+                onRefresh: _refresh,
+                onMagic: () => MagicApartmentsDialog.show(context),
+                onNotifications: () => _select(OwnerSection.notifications),
+              ),
+              Expanded(
+                child: IndexedStack(
+                  index: _sections.indexOf(_section),
+                  children: _sections.map(_page).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: primaryIndex < 0 ? _primarySections.length : primaryIndex,
+        onSelect: (index) {
+          if (index >= _primarySections.length) {
+            _scaffoldKey.currentState?.openDrawer();
+            return;
+          }
+          _select(_primarySections[index]);
+        },
+        items: [
+          const NavItem(
+            label: 'الرئيسية',
+            icon: Icons.space_dashboard_outlined,
+            activeIcon: Icons.space_dashboard_rounded,
+          ),
+          const NavItem(
+            label: 'العقارات',
+            icon: Icons.domain_outlined,
+            activeIcon: Icons.domain_rounded,
+          ),
+          NavItem(
+            label: 'الموافقات',
+            icon: Icons.fact_check_outlined,
+            activeIcon: Icons.fact_check_rounded,
+            badge: pending,
+          ),
+          const NavItem(
+            label: 'المالية',
+            icon: Icons.account_balance_wallet_outlined,
+            activeIcon: Icons.account_balance_wallet_rounded,
+          ),
+          NavItem(
+            label: 'الإشعارات',
+            icon: Icons.campaign_outlined,
+            activeIcon: Icons.campaign_rounded,
+            badge: unread,
+          ),
+          const NavItem(
+            label: 'المزيد',
+            icon: Icons.menu_rounded,
+            activeIcon: Icons.menu_open_rounded,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _Sidebar extends StatelessWidget {
@@ -228,6 +348,9 @@ class _Sidebar extends StatelessWidget {
     required this.country,
     required this.onSelect,
     required this.onSignOut,
+    this.showExtras = false,
+    this.onCountries,
+    this.onCountry,
   });
 
   final AppProfile profile;
@@ -237,6 +360,9 @@ class _Sidebar extends StatelessWidget {
   final AppCountry country;
   final ValueChanged<OwnerSection> onSelect;
   final VoidCallback onSignOut;
+  final bool showExtras;
+  final VoidCallback? onCountries;
+  final ValueChanged<AppCountry>? onCountry;
 
   @override
   Widget build(BuildContext context) {
@@ -286,10 +412,91 @@ class _Sidebar extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (showExtras)
+                  IconButton(
+                    tooltip: tr('إغلاق'),
+                    onPressed: () => Scaffold.of(context).closeDrawer(),
+                    icon: const Icon(Icons.close_rounded,
+                        size: 18, color: AppColors.textMuted),
+                    visualDensity: VisualDensity.compact,
+                  ),
               ],
             ),
           ),
           const Divider(height: 1),
+          if (showExtras) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg, AppSpacing.md, 10, AppSpacing.md),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: PopupMenuButton<AppCountry>(
+                      tooltip: tr('الدولة والعملة'),
+                      initialValue: country,
+                      onSelected: onCountry,
+                      itemBuilder: (context) => AppCountry.values
+                          .map((item) => PopupMenuItem<AppCountry>(
+                                value: item,
+                                child: Row(
+                                  children: [
+                                    Text(item.flag),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '${item.name(english: I18n.isEnglish)} · ${item.currencyCode}',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ))
+                          .toList(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: .04),
+                          borderRadius:
+                              BorderRadius.circular(AppRadius.pill),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: .10)),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(country.flag,
+                                style: const TextStyle(fontSize: 15)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '${country.name(english: I18n.isEnglish)} · ${country.currencyCode}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'Tajawal',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.arrow_drop_down_rounded,
+                                size: 18, color: AppColors.gold),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (onCountries != null)
+                    IconButton(
+                      tooltip: tr('الدول'),
+                      onPressed: onCountries,
+                      icon: const Icon(Icons.grid_view_rounded,
+                          size: 19, color: AppColors.gold),
+                    ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+          ],
           const SizedBox(height: AppSpacing.md),
           Expanded(
             child: ListView(
@@ -312,6 +519,11 @@ class _Sidebar extends StatelessWidget {
               ],
             ),
           ),
+          if (showExtras)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(10, 0, 10, 2),
+              child: Center(child: LanguageToggle()),
+            ),
           Padding(
             padding: const EdgeInsets.all(10),
             child: Container(
@@ -477,7 +689,10 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final date = DateFormat('EEEE d MMMM yyyy', 'ar').format(DateTime.now());
+    final date = DateFormat(
+      'EEEE d MMMM yyyy',
+      I18n.isEnglish ? 'en' : 'ar',
+    ).format(DateTime.now());
     return Container(
       height: 70,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -670,6 +885,157 @@ class _TopBar extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactTopBar extends StatelessWidget {
+  const _CompactTopBar({
+    required this.section,
+    required this.country,
+    required this.unread,
+    required this.refreshing,
+    required this.onMenu,
+    required this.onRefresh,
+    required this.onMagic,
+    required this.onNotifications,
+  });
+
+  final OwnerSection section;
+  final AppCountry country;
+  final int unread;
+  final bool refreshing;
+  final VoidCallback onMenu;
+  final VoidCallback onRefresh;
+  final VoidCallback onMagic;
+  final VoidCallback onNotifications;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.navy900.withValues(alpha: .6),
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withValues(alpha: .06)),
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: tr('الأقسام'),
+            onPressed: onMenu,
+            icon: const Icon(Icons.menu_rounded,
+                size: 22, color: AppColors.textPrimary),
+            visualDensity: VisualDensity.compact,
+          ),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(section.icon, size: 14, color: AppColors.gold),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        section.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${country.flag} ${country.name(english: I18n.isEnglish)} · ${country.currencyCode} · ${section.subtitle}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'Tajawal',
+                    fontSize: 9.5,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: tr('الزر السحري'),
+            onPressed: onMagic,
+            icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+            style: IconButton.styleFrom(
+              backgroundColor: AppColors.gold,
+              foregroundColor: AppColors.navy900,
+              minimumSize: const Size(36, 36),
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                tooltip: tr('الإشعارات'),
+                onPressed: onNotifications,
+                icon: const Icon(Icons.notifications_none_rounded,
+                    size: 21, color: AppColors.textSecondary),
+                visualDensity: VisualDensity.compact,
+              ),
+              if (unread > 0)
+                PositionedDirectional(
+                  top: 2,
+                  start: 2,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger,
+                      borderRadius: BorderRadius.circular(7),
+                      border: Border.all(color: AppColors.navy900, width: 1.5),
+                    ),
+                    child: Text(
+                      unread > 99 ? '99+' : '$unread',
+                      style: const TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (refreshing)
+            const Padding(
+              padding: EdgeInsetsDirectional.only(end: 8),
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.gold,
+                ),
+              ),
+            )
+          else
+            IconButton(
+              tooltip: tr('تحديث البيانات'),
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh_rounded,
+                  size: 20, color: AppColors.textSecondary),
+              visualDensity: VisualDensity.compact,
+            ),
         ],
       ),
     );

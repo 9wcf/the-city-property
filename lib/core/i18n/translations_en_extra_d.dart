@@ -286,4 +286,6 @@ const Map<String, String> kEnglishTranslationsExtraD = {
   'لا توجد تغطية إدارية للشقق': 'No apartment manager coverage',
   'عيّن مديراً لعقار كامل لتغطية كل وحداته أو استخدم «تعيين» لشقة محددة.':
       'Assign a property manager to cover all its units, or use Assign for a specific unit.',
+  'المزيد': 'More',
+  'الأقسام': 'Sections',
 };

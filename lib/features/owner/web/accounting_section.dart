@@ -10,6 +10,7 @@ import '../../../core/utils/app_utils.dart';
 import '../../../core/widgets/premium_widgets.dart';
 import '../../../data/models.dart';
 import '../../../data/repositories.dart';
+import 'accounting_report_pdf.dart';
 import 'web_ui.dart';
 
 class AccountingSection extends ConsumerStatefulWidget {
@@ -23,6 +24,7 @@ class _AccountingSectionState extends ConsumerState<AccountingSection> {
   DateTime _month = startOfMonth(DateTime.now());
   String _filter = 'الكل';
   String _query = '';
+  bool _exporting = false;
 
   Future<void> _refresh() async {
     ref.invalidate(ownerSnapshotProvider);
@@ -118,6 +120,19 @@ class _AccountingSectionState extends ConsumerState<AccountingSection> {
                     onPressed: () => _generateInvoices(portfolio),
                     icon: const Icon(Icons.auto_awesome_rounded, size: 18),
                     label: const Text('توليد فواتير الشهر'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _exporting ? null : _downloadReport,
+                    icon: _exporting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                    label: Text(
+                      _exporting ? 'جاري تجهيز التقرير…' : 'تحميل تقرير الشهر PDF',
+                    ),
                   ),
                 ],
               ),
@@ -469,13 +484,30 @@ class _AccountingSectionState extends ConsumerState<AccountingSection> {
     );
   }
 
+  Future<void> _downloadReport() async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      await _exportReport();
+      if (mounted) showSuccess(context, 'تم تنزيل التقرير المحاسبي PDF');
+    } catch (error) {
+      if (mounted) showError(context, friendlyError(error));
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   Future<void> _generateInvoices(Portfolio portfolio) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('توليد فواتير الشهر'),
         content: Text(
-          'سيتم إنشاء فواتير لجميع العقود النشطة لشهر ${webMonthName(_month)}، مع تجاوز العقود التي لديها فاتورة لهذا الشهر بالفعل.',
+          I18n.isEnglish
+              ? 'Invoices will be created for all active leases for ${webMonthName(_month)}. Leases that already have an invoice for this month will be skipped.\n\n'
+                  'A detailed accounting PDF report (invoices, payments, expenses, and monthly net) will download afterwards. You can re-download it anytime from the «Download monthly report PDF» button.'
+              : 'سيتم إنشاء فواتير لجميع العقود النشطة لشهر ${webMonthName(_month)}، مع تجاوز العقود التي لديها فاتورة لهذا الشهر بالفعل.\n\n'
+                  'بعدها سيتم تنزيل تقرير محاسبي تفصيلي PDF يشمل الفواتير والمقبوضات والمصروفات وصافي الشهر، ويمكنك إعادة تحميله في أي وقت من زر «تحميل تقرير الشهر PDF».',
         ),
         actions: [
           TextButton(
@@ -495,17 +527,71 @@ class _AccountingSectionState extends ConsumerState<AccountingSection> {
           .read(repositoryProvider)
           .generateInvoices(month: _month);
       await _refresh();
+      var reportSent = false;
+      try {
+        reportSent = await _exportReport();
+      } catch (_) {
+        reportSent = false;
+      }
       if (mounted) {
-        showSuccess(
-          context,
-          created == 0
-              ? 'كل العقود لديها فواتير لهذا الشهر'
-              : 'تم توليد $created فاتورة',
-        );
+        final saved = I18n.isEnglish
+            ? (created == 0
+                ? 'All leases already have invoices for this month'
+                : '$created invoices generated')
+            : (created == 0
+                ? 'كل العقود لديها فواتير لهذا الشهر'
+                : 'تم توليد $created فاتورة');
+        final message = I18n.isEnglish
+            ? (reportSent
+                ? '$saved — accounting report PDF downloaded'
+                : '$saved — use the «Download monthly report PDF» button to download the report')
+            : (reportSent
+                ? '$saved — وتم تنزيل التقرير المحاسبي PDF'
+                : '$saved — استخدم زر «تحميل تقرير الشهر PDF» لتنزيل التقرير');
+        showSuccess(context, message);
       }
     } catch (error) {
       if (mounted) showError(context, friendlyError(error));
     }
+  }
+
+  Future<bool> _exportReport() async {
+    final data = await ref.read(ownerDashboardProvider.future);
+    final country = ref.read(ownerCountryProvider);
+    final invoices = data.invoices
+        .where((invoice) =>
+            invoice.country == country &&
+            isSameMonth(invoice.invoiceDate, _month))
+        .toList();
+    final expenses = data.expenses
+        .where((expense) =>
+            expense.country == country &&
+            isSameMonth(expense.date, _month))
+        .toList();
+    final tenantIds = <String>{
+      for (final tenant in data.snapshot.tenants)
+        if (tenant.apartment.country == country) tenant.profile.id,
+      for (final invoice in invoices) invoice.tenantId,
+    };
+    final payments = data.snapshot.payments
+        .where((payment) =>
+            tenantIds.contains(payment.tenantId) &&
+            isSameMonth(payment.paymentDate, _month))
+        .toList();
+    final ownerName = data.snapshot.owner.fullName?.trim();
+    await downloadAccountingReportPdf(
+      AccountingReportData(
+        ownerName: ownerName == null || ownerName.isEmpty
+            ? 'مالك العقار'
+            : ownerName,
+        month: _month,
+        country: country,
+        invoices: invoices,
+        expenses: expenses,
+        payments: payments,
+      ),
+    );
+    return true;
   }
 
   Future<void> _recordPayment(Invoice invoice) async {

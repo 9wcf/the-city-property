@@ -186,57 +186,76 @@ class OverviewSection extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          OccupancyRing(
-                            rate: portfolio.occupancyRate,
-                            size: 118,
-                            label: 'الإشغال',
-                          ),
-                          const SizedBox(width: AppSpacing.lg),
-                          Expanded(
-                            child: Column(
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final details = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                moneyText(portfolio.monthlyExpected,
+                                    country: country),
+                                style: const TextStyle(
+                                  fontFamily: 'Tajawal',
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.gold,
+                                ),
+                              ),
+                              const Text(
+                                'الإيراد الشهري المتوقع من الوحدات المؤجرة',
+                                style: TextStyle(
+                                  fontFamily: 'Tajawal',
+                                  fontSize: 11,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              WebInfoTile(
+                                icon: Icons.savings_rounded,
+                                label: 'محصّل هذا الشهر',
+                                value: moneyText(collectedThisMonth,
+                                    country: country),
+                                color: AppColors.occupied,
+                              ),
+                              const SizedBox(height: 6),
+                              WebInfoTile(
+                                icon: Icons.warning_amber_rounded,
+                                label: 'مستأجرون متأخرون',
+                                value: '${snapshot.overdueTenants}',
+                                color: snapshot.overdueTenants == 0
+                                    ? AppColors.occupied
+                                    : AppColors.danger,
+                              ),
+                            ],
+                          );
+                          if (constraints.maxWidth < 380) {
+                            return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  moneyText(portfolio.monthlyExpected,
-                                      country: country),
-                                  style: const TextStyle(
-                                    fontFamily: 'Tajawal',
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.gold,
-                                  ),
-                                ),
-                                const Text(
-                                  'الإيراد الشهري المتوقع من الوحدات المؤجرة',
-                                  style: TextStyle(
-                                    fontFamily: 'Tajawal',
-                                    fontSize: 11,
-                                    color: AppColors.textMuted,
+                                Center(
+                                  child: OccupancyRing(
+                                    rate: portfolio.occupancyRate,
+                                    size: 108,
+                                    label: 'الإشغال',
                                   ),
                                 ),
                                 const SizedBox(height: AppSpacing.md),
-                                WebInfoTile(
-                                  icon: Icons.savings_rounded,
-                                  label: 'محصّل هذا الشهر',
-                                  value: moneyText(collectedThisMonth,
-                                      country: country),
-                                  color: AppColors.occupied,
-                                ),
-                                const SizedBox(height: 6),
-                                WebInfoTile(
-                                  icon: Icons.warning_amber_rounded,
-                                  label: 'مستأجرون متأخرون',
-                                  value: '${snapshot.overdueTenants}',
-                                  color: snapshot.overdueTenants == 0
-                                      ? AppColors.occupied
-                                      : AppColors.danger,
-                                ),
+                                details,
                               ],
-                            ),
-                          ),
-                        ],
+                            );
+                          }
+                          return Row(
+                            children: [
+                              OccupancyRing(
+                                rate: portfolio.occupancyRate,
+                                size: 118,
+                                label: 'الإشغال',
+                              ),
+                              const SizedBox(width: AppSpacing.lg),
+                              Expanded(child: details),
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       Row(

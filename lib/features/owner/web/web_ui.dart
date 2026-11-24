@@ -3,6 +3,7 @@ import 'package:the_city_property/core/widgets/app_text.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/i18n/app_country.dart';
+import '../../../core/i18n/i18n.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/app_utils.dart';
@@ -93,38 +94,52 @@ class WebPanel extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (title != null) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final heading = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title!,
+                      style: const TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
                       Text(
-                        title!,
+                        subtitle!,
                         style: const TextStyle(
                           fontFamily: 'Tajawal',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
+                          fontSize: 11,
+                          color: AppColors.textMuted,
                         ),
                       ),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle!,
-                          style: const TextStyle(
-                            fontFamily: 'Tajawal',
-                            fontSize: 11,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ],
                     ],
-                  ),
-                ),
-                if (action != null) action!,
-              ],
+                  ],
+                );
+                if (action == null) return heading;
+                if (constraints.maxWidth < 480) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      heading,
+                      const SizedBox(height: AppSpacing.sm),
+                      action!,
+                    ],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: heading),
+                    action!,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: AppSpacing.md),
           ],
@@ -163,41 +178,55 @@ class WebPageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final heading = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: constraints.maxWidth < 600 ? 21 : 26,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 4),
               Text(
-                title,
+                subtitle!,
                 style: const TextStyle(
                   fontFamily: 'Tajawal',
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
+                  fontSize: 12,
+                  color: AppColors.textMuted,
                 ),
               ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  subtitle!,
-                  style: const TextStyle(
-                    fontFamily: 'Tajawal',
-                    fontSize: 12,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
             ],
-          ),
-        ),
-        if (actions.isNotEmpty) ...[
-          const SizedBox(width: AppSpacing.md),
-          Wrap(spacing: 10, runSpacing: 10, children: actions),
-        ],
-      ],
+          ],
+        );
+        if (actions.isEmpty) return heading;
+        final actionsWrap =
+            Wrap(spacing: 10, runSpacing: 10, children: actions);
+        if (constraints.maxWidth < 640) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              heading,
+              const SizedBox(height: AppSpacing.sm),
+              actionsWrap,
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: heading),
+            const SizedBox(width: AppSpacing.md),
+            actionsWrap,
+          ],
+        );
+      },
     );
   }
 }
@@ -310,8 +339,9 @@ class WebKpiGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final effectiveMin = constraints.maxWidth < 520 ? 148.0 : minWidth;
         final columns =
-            (constraints.maxWidth / minWidth).floor().clamp(1, 6);
+            (constraints.maxWidth / effectiveMin).floor().clamp(1, 6);
         const gap = 12.0;
         final width =
             (constraints.maxWidth - gap * (columns - 1)) / columns;
@@ -686,6 +716,8 @@ class WebInfoTile extends StatelessWidget {
           Expanded(
             child: Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontFamily: 'Tajawal',
                 fontSize: 10,
@@ -693,13 +725,19 @@ class WebInfoTile extends StatelessWidget {
               ),
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'Tajawal',
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: color,
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
             ),
           ),
         ],
@@ -709,10 +747,10 @@ class WebInfoTile extends StatelessWidget {
 }
 
 String webMonthName(DateTime date) =>
-    DateFormat('MMMM yyyy', 'ar').format(date);
+    DateFormat('MMMM yyyy', I18n.isEnglish ? 'en' : 'ar').format(date);
 
 String webShortMonth(DateTime date) =>
-    DateFormat('MMM', 'ar').format(date);
+    DateFormat('MMM', I18n.isEnglish ? 'en' : 'ar').format(date);
 
 DateTime startOfMonth(DateTime date) => DateTime(date.year, date.month, 1);
 

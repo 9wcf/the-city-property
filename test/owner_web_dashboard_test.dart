@@ -325,7 +325,7 @@ void main() {
 
     await tester.tap(find.text('الزر السحري'));
     await tester.pumpAndSettle();
-    expect(find.text('الزر السحري — كل الشقق'), findsOneWidget);
+    expect(find.textContaining('الزر السحري — شقق'), findsOneWidget);
     expect(find.text('إجمالي الشقق'), findsOneWidget);
     expect(find.text('متبقي إيجار هذا الشهر'), findsOneWidget);
     expect(find.text('مستأجر تجريبي'), findsWidgets);

@@ -5,7 +5,7 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=1024, maximum-scale=5, viewport-fit=cover">
   <meta name="description" content="The City Property — منصة عالمية لإدارة الأملاك والمجمعات والعمارات والشقق والإيجارات.">
   <meta name="theme-color" content="#050E1C">
 
@@ -279,6 +279,32 @@
       window.addEventListener('flutter-first-frame', hide);
       // Safety: never trap the visitor on the boot screen if the engine reports ready late.
       setTimeout(hide, 20000);
+    })();
+  </script>
+  <script>
+    (function () {
+      // Flutter engine replaces the viewport meta at startup (device-width,
+      // zoom disabled). Keep the desktop layout on phones and allow zoom.
+      var desired = 'width=1024, maximum-scale=5, viewport-fit=cover';
+      function enforceViewport() {
+        var meta = document.querySelector('meta[name="viewport"]');
+        if (meta && meta.getAttribute('content') !== desired) {
+          meta.setAttribute('content', desired);
+        }
+      }
+      enforceViewport();
+      new MutationObserver(enforceViewport).observe(document.head, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['content'],
+      });
+      window.addEventListener('load', enforceViewport);
+      window.addEventListener('resize', enforceViewport);
+      window.addEventListener('orientationchange', enforceViewport);
+      setTimeout(enforceViewport, 500);
+      setTimeout(enforceViewport, 2000);
+      setTimeout(enforceViewport, 5000);
     })();
   </script>
   <script src="flutter_bootstrap.js" async></script>

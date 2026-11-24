@@ -5,6 +5,7 @@ import 'package:the_city_property/core/widgets/app_text.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/providers.dart';
 import '../../core/i18n/app_country.dart';
@@ -219,13 +220,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      'بالدخول أنت توافق على سياسة الخصوصية وشروط الاستخدام',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Tajawal',
-                        fontSize: 10,
-                        color: AppColors.textMuted.withValues(alpha: .9),
+                    InkWell(
+                      onTap: _openPrivacyPolicy,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          'بالدخول أنت توافق على سياسة الخصوصية وشروط الاستخدام',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'Tajawal',
+                            fontSize: 10,
+                            color: AppColors.gold.withValues(alpha: .85),
+                            decoration: TextDecoration.underline,
+                            decorationColor:
+                                AppColors.gold.withValues(alpha: .45),
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -235,6 +249,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    await launchUrl(
+      Uri.parse('https://the-city-property.net/privacy.html'),
+      mode: LaunchMode.externalApplication,
     );
   }
 
