@@ -1,7 +1,7 @@
 name: the_city_property
 description: The City Property — Premium Property Management System
 publish_to: 'none'
-version: 1.0.2+5
+version: 1.0.2+6
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
