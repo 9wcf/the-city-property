@@ -113,6 +113,10 @@ class AuthService {
     }
     await _client.auth.updateUser(UserAttributes(password: password));
   }
+
+  Future<void> signOutLocal() async {
+    await _client.auth.signOut(scope: SignOutScope.local);
+  }
 }
 
 class SessionController extends ChangeNotifier {
@@ -153,8 +157,12 @@ class SessionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> signOut() async {
-    await _auth.client.auth.signOut();
+  Future<void> signOut({bool local = false}) async {
+    if (local) {
+      await _auth.signOutLocal();
+    } else {
+      await _auth.client.auth.signOut();
+    }
     session = null;
     notifyListeners();
   }

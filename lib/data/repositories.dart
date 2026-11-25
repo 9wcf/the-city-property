@@ -119,6 +119,10 @@ class SupabaseRepository {
     });
   }
 
+  Future<void> deleteMyAccount() async {
+    await _client.rpc('delete_my_account');
+  }
+
   Future<AppProfile> updateProfile({
     required String id,
     String? fullName,

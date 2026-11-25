@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart' hide Text;
 import 'package:the_city_property/core/widgets/app_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/providers.dart';
 import '../../core/config/env.dart';
+import '../../core/i18n/app_country.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -131,6 +133,21 @@ class ProfileScreen extends ConsumerWidget {
           subtitle: 'The City Property · الإصدار 1.0.0',
           onTap: () => _showAbout(context),
         ),
+        const SizedBox(height: AppSpacing.sm),
+        ActionTile(
+          icon: Icons.privacy_tip_outlined,
+          title: 'سياسة الخصوصية',
+          subtitle: 'كيف نجمع بياناتك ونحميها',
+          onTap: _openPrivacyPolicy,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        ActionTile(
+          icon: Icons.delete_forever_rounded,
+          title: 'حذف الحساب',
+          subtitle: 'حذف نهائي لحسابك وبياناتك الشخصية',
+          color: AppColors.danger,
+          onTap: () => _confirmDeleteAccount(context, ref),
+        ),
         const SizedBox(height: AppSpacing.lg),
         SoftButton(
           label: 'تسجيل الخروج',
@@ -191,7 +208,10 @@ class ProfileScreen extends ConsumerWidget {
   Future<void> _changePassword(BuildContext context, WidgetRef ref) async {
     final changed = await showDialog<bool>(
       context: context,
-      builder: (context) => _ChangePasswordDialog(phone: profile.phoneNumber),
+      builder: (context) => _ChangePasswordDialog(
+        phone: profile.phoneNumber,
+        country: profile.country,
+      ),
     );
     if (changed == true && context.mounted) {
       showSuccess(context, 'تم تغيير كلمة المرور بنجاح');
@@ -290,6 +310,33 @@ class ProfileScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
+    final deleted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _DeleteAccountDialog(
+        phone: profile.phoneNumber,
+        country: profile.country,
+        ownsCompounds: profile.role == UserRole.owner,
+      ),
+    );
+    if (deleted != true) return;
+    try {
+      await ref.read(sessionControllerProvider).signOut(local: true);
+    } catch (_) {
+      // The login is already destroyed server-side; clearing the local
+      // session is best effort.
+    }
+    ref.invalidate(currentProfileProvider);
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    await launchUrl(
+      Uri.parse('https://the-city-property.net/privacy.html'),
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
   Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -336,9 +383,13 @@ class ProfileScreen extends ConsumerWidget {
 }
 
 class _ChangePasswordDialog extends ConsumerStatefulWidget {
-  const _ChangePasswordDialog({required this.phone});
+  const _ChangePasswordDialog({
+    required this.phone,
+    this.country = AppCountry.iq,
+  });
 
   final String phone;
+  final AppCountry country;
 
   @override
   ConsumerState<_ChangePasswordDialog> createState() =>
@@ -389,7 +440,11 @@ class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
     });
     try {
       final auth = ref.read(authServiceProvider);
-      await auth.signIn(phone: widget.phone, password: current);
+      await auth.signIn(
+        phone: widget.phone,
+        password: current,
+        country: widget.country,
+      );
       await auth.updatePassword(next);
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
@@ -484,6 +539,156 @@ class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _DeleteAccountDialog extends ConsumerStatefulWidget {
+  const _DeleteAccountDialog({
+    required this.phone,
+    required this.country,
+    required this.ownsCompounds,
+  });
+
+  final String phone;
+  final AppCountry country;
+  final bool ownsCompounds;
+
+  @override
+  ConsumerState<_DeleteAccountDialog> createState() =>
+      _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
+  final _passwordController = TextEditingController();
+  bool _obscure = true;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
+    final password = _passwordController.text;
+    if (password.isEmpty) {
+      setState(() => _error = 'أدخل كلمة المرور الحالية');
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final auth = ref.read(authServiceProvider);
+      await auth.signIn(
+        phone: widget.phone,
+        password: password,
+        country: widget.country,
+      );
+      await ref.read(repositoryProvider).deleteMyAccount();
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (error) {
+      if (mounted) setState(() => _error = friendlyError(error));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('حذف الحساب نهائياً؟'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'سيتم إنهاء جلستك وحذف بياناتك الشخصية: الاسم، الهاتف، الصور، '
+              'المستندات، الإشعارات والرسائل. تُؤرشف وحدتك الحالية ويُنهى عقدك '
+              'إن وجد، وتُحفظ السجلات المالية المطلوبة للمحاسبة بشكل مجهول الهوية.',
+              style: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 12,
+                height: 1.6,
+                color: AppColors.textMuted,
+              ),
+            ),
+            if (widget.ownsCompounds) ...[
+              const SizedBox(height: AppSpacing.sm),
+              const Text(
+                'إذا كنت مالكاً ولديك عقارات مسجلة، انقل ملكيتها أو احذفها أولاً '
+                'ثم أعد المحاولة.',
+                style: TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 12,
+                  height: 1.6,
+                  color: AppColors.danger,
+                ),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _passwordController,
+              obscureText: _obscure,
+              enabled: !_loading,
+              autofocus: true,
+              style: const TextStyle(
+                fontFamily: 'Tajawal',
+                color: AppColors.textPrimary,
+              ),
+              decoration: InputDecoration(
+                labelText: tr('كلمة المرور الحالية'),
+                prefixIcon: const Icon(Icons.lock_outline_rounded),
+                suffixIcon: IconButton(
+                  tooltip: _obscure ? tr('إظهار') : tr('إخفاء'),
+                  onPressed: () => setState(() => _obscure = !_obscure),
+                  icon: Icon(
+                    _obscure
+                        ? Icons.visibility_rounded
+                        : Icons.visibility_off_rounded,
+                    size: 20,
+                  ),
+                ),
+              ),
+              onSubmitted: (_) => _loading ? null : _submit(),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                _error!,
+                style: const TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 11,
+                  height: 1.5,
+                  color: AppColors.danger,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _loading ? null : () => Navigator.pop(context, false),
+          child: const Text('إلغاء'),
+        ),
+        TextButton(
+          onPressed: _loading ? null : _submit,
+          child: _loading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('حذف نهائي', style: TextStyle(color: AppColors.danger)),
+        ),
+      ],
     );
   }
 }

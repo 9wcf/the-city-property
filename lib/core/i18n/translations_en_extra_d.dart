@@ -288,4 +288,18 @@ const Map<String, String> kEnglishTranslationsExtraD = {
       'Assign a property manager to cover all its units, or use Assign for a specific unit.',
   'المزيد': 'More',
   'الأقسام': 'Sections',
+  'حذف الحساب': 'Delete account',
+  'حذف نهائي لحسابك وبياناتك الشخصية':
+      'Permanently delete your account and personal data',
+  'سياسة الخصوصية': 'Privacy Policy',
+  'كيف نجمع بياناتك ونحميها': 'How we collect and protect your data',
+  'حذف الحساب نهائياً؟': 'Delete your account permanently?',
+  'سيتم إنهاء جلستك وحذف بياناتك الشخصية: الاسم، الهاتف، الصور، المستندات، الإشعارات والرسائل. تُؤرشف وحدتك الحالية ويُنهى عقدك إن وجد، وتُحفظ السجلات المالية المطلوبة للمحاسبة بشكل مجهول الهوية.':
+      'Your session will end and your personal data will be deleted: name, phone, '
+          'photos, documents, notifications and messages. Your current unit is '
+          'archived and your lease (if any) is closed. Financial records that '
+          'must be kept for accounting are retained in anonymized form.',
+  'إذا كنت مالكاً ولديك عقارات مسجلة، انقل ملكيتها أو احذفها أولاً ثم أعد المحاولة.':
+      'If you are an owner with registered properties, transfer or delete them '
+          'first, then try again.',
 };
